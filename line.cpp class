@@ -1,0 +1,95 @@
+
+class Line {
+    int Size;
+    list<letter> Cs;
+
+public:
+    Line() : Size(0) {}
+
+    int GetLength() const { return Size; }
+
+    void InsertCharAt(int i, char ch) {
+        if (i < 0 || i > Size) {
+            cout << "Invalid position!" << endl;
+            return;
+        }
+        auto it = Cs.begin();
+        advance(it, i);
+        Cs.insert(it, letter(ch));
+        Size++;
+    }
+    void RemoveCharAt(int i) {
+        if (i < 0 || i >= Size) {
+            cout << "Invalid position!" << endl;
+            return;
+        }
+        auto it = Cs.begin();
+        advance(it, i);
+        Cs.erase(it);
+        Size--;
+    }
+
+
+    string GetLineString() const {
+        string line;
+        for (const auto& l : Cs) {
+            line += l.GetChar();
+        }
+        return line;
+    }
+    void PrintLine() const {
+        for (const auto& l : Cs) {
+            cout << l.GetChar();
+        }
+        cout << endl;
+    }
+    void WriteToFile(ofstream& wtr) const {
+        wtr << GetLineString() << endl;
+    }
+
+    void ToUpper(int start, int end) {
+        if (start < 0 || end >= Size || start > end) return;
+        auto it = Cs.begin();
+        advance(it, start);
+        for (int i = start; i <= end; ++i) {
+            it->SetChar(toupper(it->GetChar()));
+            advance(it, 1);
+        }
+    }
+
+    void ToLower(int start, int end) {
+        if (start < 0 || end >= Size || start > end) return;
+        auto it = Cs.begin();
+        advance(it, start);
+        for (int i = start; i <= end; ++i) {
+            it->SetChar(tolower(it->GetChar()));
+            advance(it, 1);
+        }
+    }
+
+    char GetCharAt(int index) const {
+        if (index < 0 || index >= Size) return '\0';
+        auto it = Cs.begin();
+        advance(it, index);
+        return it->GetChar();
+    }
+    void ReplaceSubstring(int startPos, const std::string& searchStr, const std::string& replaceStr) {
+        string line = GetLineString();
+        line.replace(startPos, searchStr.size(), replaceStr);
+
+       
+        Cs.clear();
+        for (char ch : line) {
+            Cs.push_back(letter(ch));
+        }
+        Size = line.size();
+    }
+    string getText() const {
+        return GetLineString();
+    }
+
+    friend ostream& operator<<(ostream& os, const Line& line) {
+        os << line.GetLineString(); 
+        return os;
+    }
+};
