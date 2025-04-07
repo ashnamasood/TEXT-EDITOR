@@ -1,0 +1,7 @@
+class letter {
+    char ch;
+public:
+    letter(char c) : ch(c) {}
+    char GetChar() const { return ch; }
+    void SetChar(char c) { ch = c; }
+};
