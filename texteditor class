@@ -1,0 +1,430 @@
+class TextEditor 
+{
+    vector<Document*> AllDocs;
+    int Cdoci;
+    int cursorRow, cursorCol;
+
+
+public:
+    TextEditor(string fname) {
+        Cdoci = 0;
+        cursorRow = cursorCol = 0;
+        Document* doc = new Document(fname);
+        if (doc->Load(fname)) {
+            AllDocs.push_back(doc);
+            cout << "Document '" << fname << "' loaded successfully." << endl;
+        }
+        else {
+            cout << "Failed to load document '" << fname << "'." << endl;
+            delete doc;
+        }
+    }
+
+    ~TextEditor() {
+        for (auto doc : AllDocs) {
+            delete doc;
+        }
+    }
+
+    void Display() {
+        if (AllDocs.empty()) {
+            cout << "No document loaded." << endl;
+            return;
+        }
+
+        Document* currentDoc = AllDocs[Cdoci];
+
+        currentDoc->PrintDocumentWithHighlight("searchText", false);
+
+        gotoRowCol(cursorRow, cursorCol);
+    }
+
+
+
+    void Run() {
+        if (AllDocs.empty()) {
+            cout << "No document to edit. Exiting." << endl;
+            return;
+        }
+
+        bool running = true;
+        while (running) {
+            Display(); 
+            int ch = _getch(); 
+
+            if (ch == 0 || ch == 224) {  
+                int arrow = _getch();
+                switch (arrow) {
+                case 72: // Up arrow
+                    if (cursorRow > 0) cursorRow--;
+                    break;
+                case 80: // Down arrow
+                    if (cursorRow < AllDocs[Cdoci]->GetNumberOfLines() - 1) cursorRow++;
+                    break;
+                case 75: // Left arrow
+                    if (cursorCol > 0) cursorCol--;
+                    break;
+                case 77: // Right arrow
+                    if (cursorCol < AllDocs[Cdoci]->GetLineLength(cursorRow) - 1) cursorCol++;
+                    break;
+                default:
+                    break;
+                }
+                Display();
+
+            }
+            if (ch == 8) {  // Backspace key
+                if (cursorCol > 0) {
+                    AllDocs[Cdoci]->GetLine(cursorRow)->RemoveCharAt(cursorCol - 1);
+                    cursorCol--;
+                }
+                else if (cursorCol == 0 && cursorRow > 0) {
+                    // Merge with previous line if at the start of the line
+                    Line* currentLine = AllDocs[Cdoci]->GetLine(cursorRow);
+                    Line* previousLine = AllDocs[Cdoci]->GetLine(cursorRow - 1);
+
+                    string currentContent = currentLine->GetLineString();
+                    for (char c : currentContent) {
+                        previousLine->InsertCharAt(previousLine->GetLength(), c);
+                    }
+
+                    AllDocs[Cdoci]->RemoveLine(cursorRow);
+                    cursorRow--;
+                    cursorCol = previousLine->GetLength();
+                }
+            }
+            else if (ch == '\r') {  // Enter key (new line)
+                AllDocs[Cdoci]->InsertNewLine(cursorRow, cursorCol);
+                cursorRow++;
+                cursorCol = 0;
+            }
+            else if (ch == 5) {  
+                bool editing = true;
+                while (editing) {
+                    AllDocs[Cdoci]->DisplayDocument();  // Display document while editing
+
+                    ch = _getch();  // Get input for editing
+
+                    if (ch == 8) {  // Backspace key
+                        if (cursorCol > 0) {
+                            AllDocs[Cdoci]->GetLine(cursorRow)->RemoveCharAt(cursorCol - 1);
+                            cursorCol--;
+                        }
+                        else if (cursorCol == 0 && cursorRow > 0) {
+                            // Merge with previous line if at the start of the line
+                            Line* currentLine = AllDocs[Cdoci]->GetLine(cursorRow);
+                            Line* previousLine = AllDocs[Cdoci]->GetLine(cursorRow - 1);
+
+                            string currentContent = currentLine->GetLineString();
+                            for (char c : currentContent) {
+                                previousLine->InsertCharAt(previousLine->GetLength(), c);
+                            }
+
+                            AllDocs[Cdoci]->RemoveLine(cursorRow);
+                            cursorRow--;
+                            cursorCol = previousLine->GetLength();
+                        }
+                    }
+                    else if (ch == '\r') {  // Enter key (new line)
+                        AllDocs[Cdoci]->InsertNewLine(cursorRow, cursorCol);
+                        cursorRow++;
+                        cursorCol = 0;
+                    }
+                    else if (ch == 27) {  // ESC key (exit edit mode)
+                        editing = false;
+                        cout << "Exiting edit mode." << endl;
+                    }
+
+                    else if (ch == 0 || ch == 224) {  // Arrow keys inside edit mode
+                        int arrow = _getch();
+                        switch (arrow) {
+                        case 72: // Up arrow
+                            if (cursorRow > 0) cursorRow--;
+                            break;
+                        case 80: // Down arrow
+                            if (cursorRow < AllDocs[Cdoci]->GetNumberOfLines() - 1) cursorRow++;
+                            break;
+                        case 75: // Left arrow
+                            if (cursorCol > 0) cursorCol--;
+                            break;
+                        case 77: // Right arrow
+                            if (cursorCol < AllDocs[Cdoci]->GetLineLength(cursorRow) - 1) cursorCol++;
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+
+                    else if (ch >= 32 && ch <= 126) {  // Printable characters
+                        AllDocs[Cdoci]->GetLine(cursorRow)->InsertCharAt(cursorCol, ch);
+                        cursorCol++;  // Move cursor after inserting character
+                    }
+                   
+                }
+            }
+
+            else if (ch == 18) 
+            {  // Ctrl+R to replace word
+                cout << "\nChoose replace option:\n";
+                cout << "1. Replace first occurrence of a word\n";
+                cout << "2. Replace all occurrences of a word\n";
+                cout << "3. Cursor Replace next occurrence of a word\n";
+                cout << "4. Cursor Replace previous occurrence of a word\n";
+                cout << "5. Cursor Replace all next occurrences of a word\n";
+                cout << "6. Cursor Replace all previous occurrences of a word\n";
+                cout << "Enter choice: ";
+                char option = _getch();
+                cout << endl;
+
+                string oldWord, newWord;
+
+                switch (option) {
+                case '1': {  // Replace the first occurrence
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                    
+                    if (AllDocs[Cdoci]->ReplaceFirstOccurrence(oldWord, newWord))
+                    {
+                        cout << "First occurrence replaced successfully.\n";
+                    }
+                    else {
+                        cout << "Word not found.\n";
+                    }
+                    break;
+                }
+                case '2': {  // Replace all occurrences
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                   
+                    AllDocs[Cdoci]->ReplaceAllOccurrences(oldWord, newWord);
+                    cout << "All occurrences replaced successfully.\n";
+                    break;
+                }
+                case '3': {  // Replace the first occurrence
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                    gotoRowCol(cursorRow, cursorCol);
+                    if (AllDocs[Cdoci]->ReplaceNextOccurrence(oldWord, newWord, cursorRow, cursorCol))
+
+                    {
+                        cout << "First occurrence replaced successfully.\n";
+                    }
+                    else {
+                        cout << "Word not found.\n";
+                    }
+                    break;
+                }
+                case '4': {  // Replace the previous occurrence
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                    gotoRowCol(cursorRow,cursorCol );
+                    if (AllDocs[Cdoci]->ReplacePreviousOccurrence(oldWord, newWord, cursorRow, cursorCol)) {
+                        cout << "Previous occurrence replaced successfully.\n";
+                    }
+                    else {
+                        cout << "Word not found.\n";
+                    }
+                    break;
+                }
+                case '5': {  // Replace all next occurrences
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                    gotoRowCol(cursorRow, cursorCol);
+                    AllDocs[Cdoci]->ReplaceAllNextOccurrences(oldWord, newWord, cursorRow, cursorCol);
+                    cout << "All next occurrences replaced successfully.\n";
+                    break;
+                }
+                case '6': {  // Replace all previous occurrences
+                    cout << "Enter word to replace: ";
+                    cin >> oldWord;
+                    cout << "Enter new word: ";
+                    cin >> newWord;
+                    gotoRowCol(cursorRow, cursorCol);
+                    AllDocs[Cdoci]->ReplaceAllPreviousOccurrences(oldWord, newWord, cursorRow, cursorCol);
+                    cout << "All previous occurrences replaced successfully.\n";
+                    break;
+                }
+
+                default:
+                    cout << "Invalid option.\n";
+                    break;
+                }
+            }
+
+            else
+            {
+                if (ch == 27) 
+                {  // ESC to exit
+                    running = false;
+                }
+                
+
+                else if (ch == 23) {  // Enter key to show search and modification options
+                    cout << "\nChoose an option:\n";
+                    cout << "1. Find Word (Case Sensitive)\n";
+                    cout << "2. Find Word (Case Insensitive)\n";
+                    cout << "3. Find Sentence\n";
+                    cout << "4. Find Substring\n";
+                    cout << "5. Add Prefix to Word\n";
+                    cout << "6. Add Postfix to Word\n";
+                    cout<< "7.  AvgWordlength  \n";
+                    cout << "8. SubstringCount \n";
+                    cout << "9. Find special characters count.\n";
+                    cout << "a. Find Number of Sentences\n";
+                    cout << "b. Find Number of Paragraphs\n";
+                    cout << "c. Find Largest Word Length\n";
+                    cout << "d. Find Smallest Word Length\n";
+                    cout << "e. Find Largest paragraph Word length\n";
+                    cout << "f. Words game\n";
+
+
+                    cout << "Enter choice: ";
+                    char option = _getch();
+                    cout << endl;  // To move to the next line
+
+                    string search;  // The search term
+                    bool caseInsensitive = false;
+
+                    switch (option) {
+                    case '1': {  // Find Word (Case Sensitive)
+                        cout << "Enter word to search: ";
+                        cin >> search;
+                        AllDocs[Cdoci]->PrintDocumentWithHighlight(search, false);
+                        break;
+                    }
+                    case '2': {  // Find Word (Case Insensitive)
+                        cout << "Enter word to search: ";
+                        cin >> search;
+                        AllDocs[Cdoci]->PrintDocumentWithHighlight(search, true);
+                        break;
+                    }
+                    case '3': {  // Find Sentence
+                        cout << "Enter sentence to search: ";
+                        cin.ignore();  // Ignore any leftover newline character
+                        getline(cin, search);  // Allow multi-word sentence input
+                        AllDocs[Cdoci]->FindSentence(search);
+                        break;
+                    }
+                    case '4': {  // Find Substring
+                        cout << "Enter substring to search: ";
+                        cin >> search;
+                        AllDocs[Cdoci]->FindSubstring(search);
+                        break;
+                    }
+                    case '5': {  // Add Prefix to Word
+                        cout << "Enter the word to add a prefix to: ";
+                        cin >> search;
+                        cout << "Enter the prefix: ";
+                        string prefix;
+                        cin >> prefix;
+                        AllDocs[Cdoci]->AddPrefixToWord(search, prefix);
+                        cout << "Prefix added successfully.\n";
+                        break;
+                    }
+                    case '6': {  // Add Postfix to Word
+                        cout << "Enter the word to add a postfix to: ";
+                        cin >> search;
+                        cout << "Enter the postfix: ";
+                        string postfix;
+                        cin >> postfix;
+                        AllDocs[Cdoci]->AddPostfixToWord(search, postfix);
+                        cout << "Postfix added successfully.\n";
+                        break;
+                    }
+                    case '7': {  // Average Word Length
+                        double avgLength = AllDocs[Cdoci]->AverageWordLength();
+                        cout << "Average Word Length: " << avgLength << endl;
+                        break;
+                    }
+                    case '8': {  // Substring Count
+                        cout << "Enter substring to count: ";
+                        cin >> search;
+                        int count = AllDocs[Cdoci]->SubstringCount(search);
+                        cout << "Occurrences of '" << search << "': " << count << endl;
+                        break;
+                    }
+                    case '9': {  // Special Character Count
+                        int specialCount = AllDocs[Cdoci]->SpecialCharacterCount();
+                        cout << "Special Characters Count: " << specialCount << endl;
+                        break;
+                    }
+                    case 'a': {  // Find Number of Sentences
+                        int sentenceCount = AllDocs[Cdoci]->CountSentences();
+                        cout << "Number of Sentences: " << sentenceCount << endl;
+                        break;
+                    }
+                    case 'b': {  // Find Number of Paragraphs
+                        int paragraphCount = AllDocs[Cdoci]->CountParagraphs();
+                        cout << "Number of Paragraphs: " << paragraphCount << endl;
+                        break;
+                    }
+                    case 'c': {  // Find Largest Word Length
+                        int largestLength = AllDocs[Cdoci]->FindLargestWordLength();
+                        cout << "Largest Word Length: " << largestLength << endl;
+                        break;
+                    }
+                    case 'd': {  // Find Smallest Word Length
+                        int smallestLength = AllDocs[Cdoci]->FindSmallestWordLength();
+                        cout << "Smallest Word Length: " << smallestLength << endl;
+                        break;
+                    }
+                    case 'e': {  // Find Largest Paragraph Word Length
+                        int largestParagraphWordLength = AllDocs[Cdoci]->FindLargestWordInParagraph();
+                        cout << "Largest Word Length in Paragraph: " << largestParagraphWordLength << endl;
+                        break;
+                    }
+                    case 'f': {  // Words game
+                        cout << "Starting Words Game...\n";
+                        cout << "This game finds the word that contains the most letters of other words.\n";
+
+                       
+                        string bestWord = AllDocs[Cdoci]->findBestWord(); 
+
+                        if (!bestWord.empty()) {
+                            cout << "The word containing the most letters from other words is: " << bestWord << endl;
+                        }
+                        else {
+                            cout << "No words found that contain letters from other words.\n";
+                        }
+
+                        break;
+                    }
+
+                    default:
+                        cout << "Invalid option.\n";
+                        break;
+                    }
+                }
+
+                else if (ch == 19) {  // Ctrl+S to save
+                    AllDocs[Cdoci]->Save();
+                    cout << "Document saved." << endl;
+                }
+                else if (ch == 21) {  // Ctrl+U to uppercase the word
+                    AllDocs[Cdoci]->ConvertWordToUpper(cursorRow, cursorCol);
+                }
+                else if (ch == 12) {  // Ctrl+L to lowercase the word
+                    AllDocs[Cdoci]->ConvertWordToLower(cursorRow, cursorCol);
+                }
+                else {  // Character input
+                    if (ch >= 32 && ch <= 126) {  // Check if the character is printable
+                        AllDocs[Cdoci]->InsertChar(static_cast<char>(ch), cursorRow, cursorCol);
+                        cursorCol++;
+                    }
+                }
+            }
+        }
+    }
+
+
+};
