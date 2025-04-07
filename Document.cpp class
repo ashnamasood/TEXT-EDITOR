@@ -1,0 +1,561 @@
+class Document {
+private:
+    vector<Line*> Lines;
+    string DName;
+    
+
+   
+    vector<int> FindMatchPositions(const string& lineStr, const string& searchStr) const {
+        vector<int> positions;
+        size_t pos = lineStr.find(searchStr);
+        while (pos != string::npos) {
+            positions.push_back(static_cast<int>(pos));
+            pos = lineStr.find(searchStr, pos + searchStr.size());
+        }
+        return positions;
+    }
+
+    
+    void PrintHighlightedLine(const string& lineStr, const vector<int>& positions, const string& searchStr, int highlightColor = BLUE) const {
+        int lastPos = 0;
+        for (int pos : positions) {
+            cout << lineStr.substr(lastPos, pos - lastPos); 
+            SetTextColor(highlightColor);                   
+            cout << lineStr.substr(pos, searchStr.size()); 
+            SetTextColor(WHITE);                           
+            lastPos = pos + searchStr.size();
+        }
+        cout << lineStr.substr(lastPos);
+    }
+    bool canFormWord(const string& bigWord, const string& smallWord) {
+        unordered_map<char, int> letterCounts;
+        for (char ch : bigWord) letterCounts[ch]++;  
+        for (char ch : smallWord) {
+            if (letterCounts[ch] > 0) letterCounts[ch]--;  
+            else return false;  
+        }
+        return true;
+    }
+
+public:
+    Document(const string& name) : DName(name) {}
+    string findBestWord() {
+        unordered_map<string, int> wordFormCount;
+        vector<string> allWords; 
+        for (auto& line : Lines) {
+            stringstream ss(line->getText());  
+            string word;
+            while (ss >> word) {
+                allWords.push_back(word);
+                wordFormCount[word] = 0;
+            }
+        }
+
+       
+        for (const auto& bigWord : allWords) {
+            for (const auto& smallWord : allWords) {
+                if (bigWord != smallWord && canFormWord(bigWord, smallWord)) {
+                    wordFormCount[bigWord]++;
+                }
+            }
+        }
+
+        
+        string bestWord;
+        int maxCount = 0;
+        for (const auto& entry : wordFormCount) {
+            if (entry.second > maxCount) {
+                maxCount = entry.second;
+                bestWord = entry.first;
+            }
+        }
+
+        return bestWord;
+    }
+    bool Load(const string& fname) {
+        ifstream infile(fname);
+        if (!infile.is_open()) {
+            return false;
+        }
+
+        string line;
+        while (getline(infile, line)) {
+            Line* l = new Line();
+            for (char ch : line) {
+                l->InsertCharAt(l->GetLength(), ch);
+            }
+            Lines.push_back(l);
+        }
+
+        infile.close();
+        return true;
+    }
+
+    bool Save() {
+        ofstream outfile(DName);
+        if (!outfile.is_open()) {
+            return false;
+        }
+
+        for (auto l : Lines) {
+            l->WriteToFile(outfile);
+        }
+
+        outfile.close();
+        return true;
+    }
+    void DisplayDocument() 
+    {    system("cls");
+        for (size_t i = 0; i < Lines.size(); ++i) {
+            cout << Lines[i]->GetLineString() << endl;
+        }
+    }
+    void InsertChar(char ch, int row, int col) {
+        if (row < 0 || row >= GetNumberOfLines()) {
+            cout << "Invalid row!" << endl;
+            return;
+        }
+        Line* line = Lines[row];
+        line->InsertCharAt(col, ch);
+    }
+    void RemoveLine(int row) {
+        if (row < 0 || row >= Lines.size()) {
+            cout << "Invalid row!" << endl;
+            return;
+        }
+        auto it = Lines.begin();
+        advance(it, row);
+        Lines.erase(it);
+    }
+
+    Line* GetLine(int row) {
+        if (row >= 0 && row < Lines.size()) {
+            return Lines[row];
+        }
+        return nullptr; 
+    }
+    void FindSentence(const string& sentence) {
+        bool found = false;
+        for (size_t i = 0; i < Lines.size(); ++i) {
+            string lineStr = Lines[i]->GetLineString();
+            size_t pos = lineStr.find(sentence);
+            if (pos != string::npos) {
+                found = true;
+                cout << "Sentence found in line " << i + 1 << ": " << lineStr << endl;
+            }
+        }
+
+        if (!found) {
+            cout << "Sentence not found." << endl;
+        }
+    }
+    void FindSubstring(const string& substring) {
+        bool found = false;
+        for (size_t i = 0; i < Lines.size(); ++i) {
+            string lineStr = Lines[i]->GetLineString();
+            vector<int> matchPositions = FindMatchPositions(lineStr, substring);
+
+            if (!matchPositions.empty()) {
+                found = true;
+                cout << "Substring found in line " << i + 1 << ": " << lineStr << endl;
+                for (int pos : matchPositions) {
+                    cout << "Position: " << pos << endl;
+                }
+            }
+        }
+
+        if (!found) {
+            cout << "Substring not found." << endl;
+        }
+    }
+
+    void InsertNewLine(int row, int col) {
+        if (row < 0 || row >= GetNumberOfLines()) {
+            cout << "Invalid row!" << endl;
+            return;
+        }
+
+        Line* currentLine = Lines[row];
+        Line* newLine = new Line();
+
+        for (int i = col; i < currentLine->GetLength(); ++i) {
+            newLine->InsertCharAt(newLine->GetLength(), currentLine->GetCharAt(i));
+        }
+
+        while (currentLine->GetLength() > col) {
+            currentLine->RemoveCharAt(col);
+        }
+
+        Lines.insert(Lines.begin() + row + 1, newLine);
+    }
+
+    void PrintDocument() {
+        for (auto line : Lines) {
+            cout << line->GetLineString() << endl;
+        }
+    }
+    int GetNumberOfLines() const {
+        return Lines.size();
+    }
+    int GetLineLength(int row) const {
+        if (row < 0 || row >= GetNumberOfLines()) return 0;
+        return Lines[row]->GetLength();
+    }
+
+    void ConvertWordToUpper(int row, int col) {
+        if (row < 0 || row >= GetNumberOfLines()) return;
+        Line* line = Lines[row];
+        int start = col, end = col;
+
+        while (start > 0 && isalnum(line->GetCharAt(start - 1))) --start;
+
+        while (end < line->GetLength() && isalnum(line->GetCharAt(end))) ++end;
+        end--;
+
+        line->ToUpper(start, end);
+    }
+
+    void ConvertWordToLower(int row, int col) {
+        if (row < 0 || row >= GetNumberOfLines()) return;
+        Line* line = Lines[row];
+        int start = col, end = col;
+
+        
+        while (start > 0 && isalnum(line->GetCharAt(start - 1))) --start;
+
+        
+        while (end < line->GetLength() && isalnum(line->GetCharAt(end))) ++end;
+        end--;
+
+        
+        line->ToLower(start, end);
+    }
+
+   
+    void PrintDocumentWithHighlight(const string& searchText, bool caseInsensitive = false) {
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            string searchStr = searchText;
+
+            if (caseInsensitive) {
+                transform(lineStr.begin(), lineStr.end(), lineStr.begin(), ::tolower);
+                transform(searchStr.begin(), searchStr.end(), searchStr.begin(), ::tolower);
+            }
+
+            vector<int> matchPositions = FindMatchPositions(lineStr, searchStr);
+            if (!matchPositions.empty()) {
+                PrintHighlightedLine(line->GetLineString(), matchPositions, searchText);
+            }
+            else {
+                cout << line->GetLineString();
+            }
+            cout << endl;
+        }
+    }
+  
+    bool IsWholeWord(const string& lineStr, size_t start, size_t end) {
+       
+        if (start > 0 && isalnum(lineStr[start - 1])) {
+            return false;
+        }
+        
+        if (end < lineStr.size() && isalnum(lineStr[end])) {
+            return false; 
+        }
+        return true;
+    }
+
+    bool ReplaceFirstOccurrence(const string& oldWord, const string& newWord) {
+        for (auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            size_t pos = lineStr.find(oldWord);
+            while (pos != string::npos) {
+                size_t end = pos + oldWord.size(); 
+                if (IsWholeWord(lineStr, pos, end)) {
+                    line->ReplaceSubstring(pos, oldWord, newWord);
+                    return true; 
+                }
+                
+                pos = lineStr.find(oldWord, pos + 1);
+            }
+        }
+        return false;
+    }
+
+    void ReplaceAllOccurrences(const string& oldWord, const string& newWord) {
+        for (auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            size_t pos = lineStr.find(oldWord);
+            while (pos != string::npos) {
+                size_t end = pos + oldWord.size(); 
+                if (IsWholeWord(lineStr, pos, end)) {
+                    line->ReplaceSubstring(pos, oldWord, newWord);
+                    lineStr = line->GetLineString(); 
+                    pos = lineStr.find(oldWord, pos + newWord.size());
+                }
+                else {
+                   
+                    pos = lineStr.find(oldWord, pos + 1);
+                }
+            }
+        }
+    }
+
+    void AddPrefixToWord(const string& word, const string& prefix) {
+        for (auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            size_t pos = lineStr.find(word);
+            while (pos != string::npos) {
+               
+                for (size_t i = 0; i < word.size(); ++i) {
+                    line->RemoveCharAt(pos);
+                }
+               
+                string newWord = prefix + word;
+                for (size_t i = 0; i < newWord.size(); ++i) {
+                    line->InsertCharAt(pos + i, newWord[i]);
+                }
+                
+                lineStr = line->GetLineString();
+                pos = lineStr.find(word, pos + newWord.size());
+            }
+        }
+    }
+
+    void AddPostfixToWord(const string& word, const string& postfix) {
+        for (auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            size_t pos = lineStr.find(word);
+            while (pos != string::npos) {
+               
+                for (size_t i = 0; i < word.size(); ++i) {
+                    line->RemoveCharAt(pos);
+                }
+              
+                string newWord = word + postfix;
+                for (size_t i = 0; i < newWord.size(); ++i) {
+                    line->InsertCharAt(pos + i, newWord[i]);
+                }
+               
+                lineStr = line->GetLineString();
+                pos = lineStr.find(word, pos + newWord.size());
+            }
+        }
+    }
+    double AverageWordLength() const {
+        int totalWords = 0;
+        int totalLength = 0;
+
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            istringstream iss(lineStr);
+            string word;
+
+            while (iss >> word) { 
+                totalWords++;
+                totalLength += word.size();
+            }
+        }
+        return totalWords == 0 ? 0 : static_cast<double>(totalLength) / totalWords;
+    }
+    friend istream& operator>>(istream& is, Document& doc) {
+        string line;
+        while (getline(is, line)) {
+            Line* newLine = new Line();
+            for (char ch : line) {
+                newLine->InsertCharAt(newLine->GetLength(), ch);
+            }
+            doc.Lines.push_back(newLine);
+        }
+        return is;
+    }
+
+  
+    int SubstringCount(const string& substring) const {
+        int count = 0;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            size_t pos = lineStr.find(substring);
+
+            while (pos != string::npos) {
+                count++;
+                pos = lineStr.find(substring, pos + 1);
+            }
+        }
+        return count;
+    }
+
+   
+    int SpecialCharacterCount() const {
+        int count = 0;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            for (char ch : lineStr) {
+                if (!isalnum(ch) && !isspace(ch)) {  
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+    int CountSentences() const {
+        int sentenceCount = 0;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            for (char ch : lineStr) {
+                if (ch == '.' || ch == '!' || ch == '?') {
+                    sentenceCount++;
+                }
+            }
+        }
+        return sentenceCount;
+    }
+
+    
+    int CountParagraphs() const {
+        int paragraphCount = 0;
+        bool inParagraph = false;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            if (lineStr.empty()) {
+                if (inParagraph) {
+                    paragraphCount++;
+                    inParagraph = false;
+                }
+            }
+            else {
+                inParagraph = true;
+            }
+        }
+        if (inParagraph) {
+            paragraphCount++;  
+        }
+        return paragraphCount;
+    }
+
+   
+    int FindLargestWordLength() const {
+        int largestLength = 0;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            istringstream iss(lineStr);
+            string word;
+            while (iss >> word) {
+                largestLength = max(largestLength, static_cast<int>(word.size()));
+            }
+        }
+        return largestLength;
+    }
+
+   
+    int FindSmallestWordLength() const {
+        int smallestLength = INT_MAX;
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+            istringstream iss(lineStr);
+            string word;
+            while (iss >> word) {
+                smallestLength = min(smallestLength, static_cast<int>(word.size()));
+            }
+        }
+        return (smallestLength == INT_MAX) ? 0 : smallestLength;
+    }
+    
+    int FindLargestWordInParagraph() const {
+        int largestWordLengthInParagraph = 0;
+        int largestParagraphLength = 0;
+        int currentParagraphLength = 0;
+
+        int largestInParagraph = 0; 
+
+        for (const auto& line : Lines) {
+            string lineStr = line->GetLineString();
+
+            
+            if (lineStr.empty()) {
+                if (currentParagraphLength > largestParagraphLength) {
+                    largestParagraphLength = currentParagraphLength;
+                    largestWordLengthInParagraph = largestInParagraph; 
+                }
+                currentParagraphLength = 0;  
+                largestInParagraph = 0;  
+            }
+            else {
+              
+                istringstream iss(lineStr);
+                string word;
+                while (iss >> word) {
+                    largestInParagraph = max(largestInParagraph, static_cast<int>(word.size()));
+                }
+                currentParagraphLength += largestInParagraph; 
+            }
+        }
+
+        
+        if (currentParagraphLength > largestParagraphLength) {
+            largestParagraphLength = currentParagraphLength;
+            largestWordLengthInParagraph = largestInParagraph;
+        }
+
+        return largestWordLengthInParagraph;
+    }
+    bool ReplaceNextOccurrence(const std::string& searchStr, const std::string& replaceStr, int& cursorRow, int& cursorCol) {
+        for (int i = cursorRow; i < Lines.size(); ++i) {
+            std::string lineContent = Lines[i]->GetLineString();
+            auto positions = FindMatchPositions(lineContent, searchStr); 
+            for (int pos : positions) {
+                if (i == cursorRow && pos < cursorCol) continue;  
+                Lines[i]->ReplaceSubstring(pos, searchStr, replaceStr);  
+                cursorRow = i;
+                cursorCol = pos + replaceStr.size();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool ReplacePreviousOccurrence(const std::string& searchStr, const std::string& replaceStr, int& cursorRow, int& cursorCol) {
+        for (int i = cursorRow; i >= 0; --i) {
+            std::string lineContent = Lines[i]->GetLineString();
+            auto positions = FindMatchPositions(lineContent, searchStr);
+            for (auto it = positions.rbegin(); it != positions.rend(); ++it) {
+                int pos = *it;
+                if (i == cursorRow && pos >= cursorCol) continue;  
+                Lines[i]->ReplaceSubstring(pos, searchStr, replaceStr);
+                cursorRow = i;
+                cursorCol = pos + replaceStr.size();  
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void ReplaceAllNextOccurrences(const std::string& searchStr, const std::string& replaceStr, int cursorRow, int cursorCol) {
+        for (int i = cursorRow; i < Lines.size(); ++i) {
+            std::string lineContent = Lines[i]->GetLineString();
+            auto positions = FindMatchPositions(lineContent, searchStr);
+            for (int pos : positions) {
+                if (i == cursorRow && pos < cursorCol) continue;
+                Lines[i]->ReplaceSubstring(pos, searchStr, replaceStr);
+            }
+        }
+    }
+
+    void ReplaceAllPreviousOccurrences(const std::string& searchStr, const std::string& replaceStr, int cursorRow, int cursorCol) {
+        for (int i = cursorRow; i >= 0; --i) {
+            std::string lineContent = Lines[i]->GetLineString();
+            auto positions = FindMatchPositions(lineContent, searchStr);
+            for (auto it = positions.rbegin(); it != positions.rend(); ++it) {
+                int pos = *it;
+                if (i == cursorRow && pos >= cursorCol) continue;
+                Lines[i]->ReplaceSubstring(pos, searchStr, replaceStr);
+            }
+        }
+    }
+
+    ~Document() {
+        for (auto line : Lines) {
+            delete line;
+        }
+    }
+};
